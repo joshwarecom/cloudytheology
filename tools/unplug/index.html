@@ -13,7 +13,7 @@ body{
     width: 90%;
     background: linear-gradient(135deg ,#00ccff,#00008c);
     color: #fff;
-    margin: 100px auto 0;
+    margin: 50px auto 0;
     border-radius: 20px;
     padding: 40px 35px;
     text-align: center;
@@ -22,11 +22,79 @@ body{
 <body>
 <div class="card">
 JSON Data:<br>
-<textarea id="jsonData" style="width: 1024px; height: 128px;"></textarea><br><br>
+<textarea id="jsonData" style="width: 1024px; height: 128px;">{"_3/25/2025":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,30,10,0],"_3/26/2025":[0,0,0,0,0,0,0,0,3,0,10,0,0,0,0,0,0,0,0,0,0,0,0,0]}</textarea><br><br>
 <input type="button" value="Convert!" onclick="convert();"><br><br>
 Output:<br>
 <textarea id="outputData" style="width: 1024px; height: 128px;"></textarea><br><br>
+<canvas id="graphCanvas" width="1024" height="400"></canvas>
+<canvas id="legend" width="128" height="700" style="position: absolute; top: 100px; left: 100px;"></canvas>
 <script>
+
+  const canvas = document.getElementById("graphCanvas");
+  const legend = document.getElementById("legend");
+  const ctx = canvas.getContext("2d");
+  const ctx_l = legend.getContext("2d");
+
+  const colors = [
+  "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF", 
+  "#800000", "#008000", "#000080", "#808000", "#800080", "#008080", 
+  "#C0C0C0", "#808080", "#FFA07A", "#20B2AA", "#778899", "#B0C4DE", 
+  "#FFFFE0", "#D8BFD8", "#90EE90", "#ADD8E6", "#F08080", "#E0FFFF", 
+  "#FAFAD2", "#D3D3D3", "#98FB98", "#AFEEEE", "#FFE4C4", "#FFDAB9", 
+  "#CD853F", "#DA70D6", "#F0E68C", "#BC8F8F", "#A0522D", "#8B4513", 
+  "#FA8072", "#E9967A", "#BDB76B", "#6B8E23", "#556B2F", "#9ACD32", 
+  "#006400", "#228B22", "#008B8B", "#483D8B", "#2F4F4F", "#9400D3", 
+  "#8A2BE2", "#4B0082", "#6A5ACD", "#708090", "#191970", "#0000CD", 
+  "#00008B", "#696969", "#7B68EE", "#4682B4", "#87CEFA", "#778899", 
+  "#B0E0E6", "#DCDCDC", "#F5F5F5", "#FFFAFA"
+];
+  
+    function renderGraph(data) {
+      const pointWidth = canvas.width / 24;  // 24 points per day (based on 24 values in the array)
+      const baseHeight = canvas.height;
+
+      ctx_l.fillStyle = "#000000";  // Set the fill color to white
+      ctx_l.fillRect(0, 0, legend.width, legend.height);  // Fill the whole canvas
+
+      ctx.fillStyle = "#000000";  // Set the fill color to white
+      ctx.fillRect(0, 0, canvas.width, canvas.height);  // Fill the whole canvas
+
+      let tmpindex = 0;
+      let mtrindex = 0;
+      // Loop through each key in the data object
+      for (const key in data) {
+        if (tmpindex > colors.length) tmpindex = 0;
+        const values = data[key];
+        const lineColor = colors[tmpindex++];
+
+        ctx.beginPath();
+        ctx.strokeStyle = lineColor;
+        ctx.lineWidth = 2;
+
+        ctx_l.fillStyle = lineColor;
+        // Set the font style (optional)
+        ctx_l.font = "10px Arial";  // Font size 30px, Arial font
+        // Draw text in the upper-left corner (at position 10, 30)
+        ctx_l.fillText(key, 10, 20+(12*mtrindex));
+        mtrindex++;
+
+        // Loop through the values to create points
+        values.forEach((value, index) => {
+          const x = index * pointWidth + pointWidth / 2;
+          const y = baseHeight - value * 10;  // Scaling the values for better visibility
+
+          if (index === 0) {
+            ctx.moveTo(x, y);  // Move to the first point
+          } else {
+            ctx.lineTo(x, y);  // Draw a line to subsequent points
+          }
+        });
+
+        // Apply the stroke (draw the line)
+        ctx.stroke();
+      }
+    }
+  
   function convert() {
     e = document.getElementById('jsonData').value;
     o = JSON.parse(e);
@@ -39,6 +107,8 @@ Output:<br>
       val = val + "\n";
     }
     document.getElementById('outputData').value = val;
+
+    renderGraph(o);
   }
 </script>
   </div></body>
