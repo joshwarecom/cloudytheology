@@ -89,7 +89,7 @@ if (speechSynthesis.onvoiceschanged !== undefined) {
         function onClickPlay2() {
             if(!flag){
                 flag = true;
-                utterance = new SpeechSynthesisUtterance(document.querySelector('#texttospeech').textContent);
+                utterance = new SpeechSynthesisUtterance(document.querySelector('#texttospeech').value);
               utterance.rate = 2.5; 
                 //utterance.voice = synth.getVoices()[0];
                 
