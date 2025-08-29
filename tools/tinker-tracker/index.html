@@ -1,3 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tinker Tracker 1.0</title>
+  <style>
+*{
+    margin: 0;
+    padding: 0;
+    font-family: 'poppins',sans-serif;
+    box-sizing: border-box;
+}
+body{
+    background: #222;
+
+}
+.card{
+    width: 90%;
+    max-width: 470px;
+    background: linear-gradient(135deg ,#00cccc,#cc00cc);
+    color: #fff;
+    margin: 100px auto 0;
+    border-radius: 20px;
+    padding: 40px 35px;
+    text-align: center;
+}
+
+.Food-icon{
+    width: 170px;
+    margin-top: 30px;
+}
+.food {
+  text-align: left;
+}
+.food h1{
+    font-size: 80px;
+    font-weight: 500;
+}
+.food h2{
+    font-size: 45px;
+    font-weight: 400;
+    margin-top: -10px;
+}
+.details{
+    display: flex;
+    align-items: left;
+    justify-content: space-between;
+    padding: 0 20px;
+    margin-top: 50px;
+}
+.col{
+    display: flex;
+    align-items: left;
+    text-align: left;
+}
+.col img{
+    width: 40px;
+    margin-right:10px ;
+}    
+
+  </style>
 <script>
 function setCookie(name,value,days) {
     var expires = "";
@@ -21,4 +83,105 @@ function getCookie(name) {
 function eraseCookie(name) {   
     document.cookie = name +'=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
 }
+
+function isValidDate(date) {
+  return date instanceof Date && !isNaN(date.getTime());
+}
+
+document.override_key = null;
+
+function get_key() {
+if (document.override_key) return document.override_key;
+const today = new Date();
+const formattedDate = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
+return formattedDate;
+}
+
+document.track_history = {};
+try { document.track_history = JSON.parse(getCookie("track_history"));} catch(e) { alert(e);}
+if (document.track_history == null) document.track_history = {};
+
+function get_value() {
+try {
+	if (!Object.keys(document.track_history).includes(get_key())) document.track_history[get_key()] = 0;
+	return document.track_history[get_key()];
+} catch(e) { alert(e);}
+}
+
+function increment_value(q) {
+	let v = get_value();
+	v = v + q;
+	document.track_history[get_key()] = v;
+	setCookie("track_history",get_value());
+	try { document.getElementById("count_value").innerHTML = v;} catch(e) { alert(e);}
+}
+
+function toggle_extras() {
+	el = document.getElementById("extras");
+	if (el.style.display != "none") el.style.display = "none";
+	else el.style.display = "";
+}
+
+function set_value() {
+	let val = prompt("What should the new value be?");
+	if (val == "") return;
+	try { val = Number(val);} catch(e) { }
+	if (Number.isInteger(val)) {
+		increment_value(get_value() * -1);
+		increment_value(val);
+	}
+	else alert("Only integers allowed.");	
+}
+
+function set_day() {
+	let val = prompt("What day should it be?");
+	if (val == "") { document.override_key = null; return;}
+	if (isValidDate(new Date(val))) {
+		document.override_key = val;
+		increment_value(0);
+	} else alert("Valid dates only");
+}
+
+function show_history() {
+let el = document.getElementById("history_container");
+if (el.style.display != "none") el.style.display = "none";
+else {
+el.style.display = "";
+el = document.getElementById("history");
+el.innerHTML = JSON.stringify(document.track_history) + "<br><br>";
+}
+}
+
 </script>
+
+</head>
+<body>
+  <div class="card">
+    <div class="ui">
+      <p><b><h3><center>Tinker Tracker 1.0 <font size='-1'>[updated: 2025-08-29]</font></center></h3></b></p>
+      <p> <div id="extras" style="display: none;"><input type="button" value=" Set Value " onclick="set_value();"> <input type="button" value=" Set Current Day " onclick="set_day();"> <input type="button" value=" Toggle History " onclick="show_history();"></div></p>
+      <p style="width: 100%;">
+      </p>
+<div style="background-color: white; color: black; display: none;" id="history_container">
+<br>
+<span id="history"></span>
+</div>
+<br><br>
+<table width="100%" border=0 cellpadding=0 cellspacing=0>
+<tr>
+<td><center><input type="button" style="font-size: 124px; width: 96px; background-color: #400bc0; color: white;" onclick="increment_value(-1);" value="-"></button></center></td>
+<td><center><div id="count_value" style="font-size: 64px;"></div></center></td>
+<td><center><input type="button" style="font-size: 124px; width: 96px; background-color: #400bc0; color: white;" onclick="increment_value(+1);" value="+"></button></center></td>
+</tr>
+</table>
+      <br>
+      <center>
+      <img src="tinker-tracker.webp" class="icon" style="width: 100px; height: 100px; opacity: 0.25; " onclick="toggle_extras();">
+      </center>
+    </div>
+  </div>    
+<script>
+try { document.getElementById("count_value").innerHTML = get_value();} catch(e) { alert(e);}
+</script>  
+</body>
+</html>
