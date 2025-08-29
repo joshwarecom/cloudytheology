@@ -112,7 +112,7 @@ function increment_value(q) {
 	let v = get_value();
 	v = v + q;
 	document.track_history[get_key()] = v;
-	setCookie("track_history",document.track_history);
+	setCookie("track_history",JSON.stringify(document.track_history));
 	try { document.getElementById("count_value").innerHTML = v;} catch(e) { alert(e);}
 }
 
