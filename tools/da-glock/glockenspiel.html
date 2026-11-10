@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>30-Key Glockenspiel MIDI Guide</title>
+    
+    <!-- Load Tone.js and Tone.js MIDI Parser from CDNs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/build/Midi.js"></script>
+
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #1e1e1e; color: white; text-align: center; padding: 20px; }
+        .controls { background: #2d2d2d; padding: 20px; border-radius: 8px; display: inline-block; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); max-width: 95%; }
+        .control-row { margin: 10px 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 15px; }
+        button, input, select { font-size: 15px; padding: 8px 12px; border-radius: 4px; border: 1px solid #444; background: #333; color: white; }
+        button { background: #4CAF50; color: white; border: none; cursor: pointer; transition: background 0.2s; }
+        button:hover:not(:disabled) { background: #45a049; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        label { cursor: pointer; }
+        
+        #keyboard-wrapper { width: 100%; overflow-x: auto; padding: 40px 0; }
+        #keyboard { 
+            position: relative; 
+            height: 220px; 
+            margin: 0 auto; 
+            display: inline-block; 
+            background: #111; 
+            border-radius: 8px;
+            padding: 20px 10px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        }
+        
+        /* Bar CSS */
+        .key { 
+            position: absolute; 
+            box-sizing: border-box; 
+            background: linear-gradient(to bottom, #f0f0f0, #d0d0d0, #a0a0a0);
+            border: 1px solid #777;
+            border-radius: 2px;
+            color: #333;
+            font-weight: bold;
+            font-size: 11px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 12px;
+            box-shadow: 2px 5px 8px rgba(0,0,0,0.6);
+            transition: filter 0.05s;
+        }
+
+        /* "Screws" pinning the metal bars */
+        .key::before, .key::after {
+            content: '';
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background: #222;
+            border-radius: 50%;
+            left: 50%;
+            transform: translateX(-50%);
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.8), 1px 1px 1px rgba(255,255,255,0.6);
+        }
+        .key::before { top: 10px; }
+        .key::after { bottom: 28px; }
+
+        .white { width: 34px; z-index: 1; }
+        .black { width: 34px; z-index: 2; }
+        
+        /* Highlight Colors: Track 0 = Blue, Track 1 = Orange */
+        .key.active-track-0 { background: linear-gradient(to bottom, #82c8fa, #4dabf7, #228be6) !important; color: white; }
+        .key.active-track-1 { background: linear-gradient(to bottom, #ffc078, #ff922b, #e8590c) !important; color: white; }
+
+        .status { margin-top: 15px; font-size: 14px; color: #aaa; }
+    </style>
+</head>
+<body>
+
+    <h2>30-Key Glockenspiel Follow-Along</h2>
+    
+    <div class="controls">
+        <!-- Input Row: Upload, Preset Dropdown, and Hand Selection -->
+        <div class="control-row">
+            <label>Upload MIDI: 
+                <input type="file" id="midi-upload" accept=".mid,.midi">
+            </label>
+            
+            <span>OR</span>
+
+            <label>Preset Song:
+                <select id="preset-select">
+                    <!-- Populated automatically from JSON config -->
+                </select>
+            </label>
+
+            <label>Hands:
+                <select id="hand-selection">
+                    <option value="both" selected>Both Hands</option>
+                    <option value="right">Right Hand Only (Track 0)</option>
+                    <option value="left">Left Hand Only (Track 1)</option>
+                </select>
+            </label>
+        </div>
+
+        <hr style="border-color: #444; margin: 15px 0;">
+
+        <!-- Playback Controls Row -->
+        <div class="control-row">
+            <button id="btn-play" disabled>Play</button>
+            <button id="btn-stop" disabled>Stop</button>
+            
+            <label style="margin-left: 10px;">Speed: 
+                <input type="range" id="speed-slider" min="0.1" max="2.0" step="0.1" value="1.0">
+                <span id="speed-display">1.0x</span>
+            </label>
+
+            <label style="margin-left: 10px;">
+                <input type="checkbox" id="loop-checkbox"> Loop
+            </label>
+        </div>
+        
+        <div class="status" id="status-text">Please upload or select a MIDI file to begin.</div>
+    </div>
+
+    <div id="keyboard-wrapper">
+        <div id="keyboard"></div>
+    </div>
+
+    <script>
+        // --- EASY-TO-UPDATE PRESET SONGS JSON CONFIG ---
+        const PRESET_MIDI_SONGS = [
+            { title: "-- Choose a preset song --", url: "" },
+            { title: "Bach - Chorale (BWV 7.7)", url: "https://cdn.jsdelivr.net/gh/cuthbertLab/music21/music21/corpus/bach/bwv7.7.mxl" },
+            { title: "Charpentier - Te Deum", url: "https://cdn.jsdelivr.net/gh/musescore/MuseScore@master/demos/Te Deum.mid" }
+        ];
+
+        // --- 1. GENERATE THE 30-KEY GLOCKENSPIEL (G to C) ---
+        const keyboard = document.getElementById('keyboard');
+        const allNotes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        
+        let currentOctave = 5; 
+        let noteIndex = 7;     
+        let totalKeys = 30;    
+        
+        let whiteKeyCount = 0;
+        const keyWidth = 44; 
+
+        for (let i = 0; i < totalKeys; i++) {
+            const noteNameBase = allNotes[noteIndex];
+            const noteName = noteNameBase + currentOctave;
+            const isBlack = noteNameBase.includes("#");
+            
+            const keyDiv = document.createElement('div');
+            keyDiv.className = `key ${isBlack ? 'black' : 'white'}`;
+            keyDiv.id = `key-${noteName}`; 
+            keyDiv.innerText = noteNameBase; 
+            
+            const taperRatio = i / totalKeys;
+
+            if (isBlack) {
+                keyDiv.style.left = `${(whiteKeyCount - 1) * keyWidth + (keyWidth / 2)}px`;
+                keyDiv.style.top = '15px';
+                keyDiv.style.height = `${130 - (40 * taperRatio)}px`;
+            } else {
+                keyDiv.style.left = `${whiteKeyCount * keyWidth}px`;
+                keyDiv.style.top = '100px';
+                keyDiv.style.height = `${160 - (50 * taperRatio)}px`;
+                whiteKeyCount++;
+            }
+            
+            keyboard.appendChild(keyDiv);
+            
+            noteIndex++;
+            if (noteIndex > 11) {
+                noteIndex = 0;
+                currentOctave++;
+            }
+        }
+        keyboard.style.width = `${whiteKeyCount * keyWidth}px`;
+
+        // --- 2. AUDIO SYNTH SETUP ---
+        const synth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: "sine" },
+            envelope: { attack: 0.005, decay: 1.2, sustain: 0, release: 0.8 } 
+        }).toDestination();
+        
+        let currentMidi = null;
+
+        // Helper to reset active key visual highlights
+        function clearAllHighlights() {
+            document.querySelectorAll('.key').forEach(key => {
+                key.classList.remove('active-track-0', 'active-track-1');
+            });
+        }
+
+        // --- 3. UI CONTROLS & EVENT LISTENERS ---
+        const btnPlay = document.getElementById('btn-play');
+        const btnStop = document.getElementById('btn-stop');
+        const speedSlider = document.getElementById('speed-slider');
+        const speedDisplay = document.getElementById('speed-display');
+        const loopCheckbox = document.getElementById('loop-checkbox');
+        const statusText = document.getElementById('status-text');
+        
+        const fileUpload = document.getElementById('midi-upload');
+        const presetSelect = document.getElementById('preset-select');
+        const handSelection = document.getElementById('hand-selection');
+
+        // Populate preset dropdown from JSON array
+        PRESET_MIDI_SONGS.forEach(song => {
+            const opt = document.createElement('option');
+            opt.value = song.url;
+            opt.textContent = song.title;
+            presetSelect.appendChild(opt);
+        });
+
+        loopCheckbox.addEventListener('change', (e) => {
+            Tone.Transport.loop = e.target.checked;
+        });
+
+        // Helper to load parsed MIDI data
+        function loadMidiObject(midiData, displayName) {
+            Tone.Transport.stop();
+            Tone.Transport.cancel();
+            clearAllHighlights();
+            
+            currentMidi = midiData;
+            statusText.innerText = `Loaded: ${displayName}. Tracks: ${currentMidi.tracks.length}`;
+            btnPlay.disabled = false;
+        }
+
+        // Local file upload event
+        fileUpload.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            presetSelect.value = ""; // Reset preset selector
+            statusText.innerText = "Parsing MIDI file...";
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const midi = new Midi(e.target.result);
+                loadMidiObject(midi, file.name);
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // Preset dropdown change event
+        presetSelect.addEventListener('change', async (e) => {
+            const url = e.target.value;
+            if (!url) return;
+
+            fileUpload.value = ""; // Clear file upload
+            statusText.innerText = "Fetching preset MIDI...";
+            Tone.Transport.stop();
+            Tone.Transport.cancel();
+            clearAllHighlights();
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const arrayBuffer = await response.arrayBuffer();
+                const midi = new Midi(arrayBuffer);
+                const selectedSong = PRESET_MIDI_SONGS.find(s => s.url === url);
+                loadMidiObject(midi, selectedSong ? selectedSong.title : "Preset");
+            } catch (err) {
+                statusText.innerText = `Failed to load preset. Note: Check CORS policy if loading external links.`;
+                console.error(err);
+            }
+        });
+
+        // --- 4. PLAYBACK ENGINE ---
+        btnPlay.addEventListener('click', async () => {
+            await Tone.start(); 
+            if (!currentMidi) return;
+            
+            Tone.Transport.stop();
+            Tone.Transport.cancel();
+            clearAllHighlights();
+            
+            Tone.Transport.ppq = currentMidi.header.ppq;
+            const baseBpm = currentMidi.header.tempos.length > 0 ? currentMidi.header.tempos[0].bpm : 120;
+            Tone.Transport.bpm.value = baseBpm * parseFloat(speedSlider.value);
+
+            Tone.Transport.loop = loopCheckbox.checked;
+            Tone.Transport.loopEnd = currentMidi.durationTicks + "i";
+
+            // 1. Schedule highlight reset at tick 0
+            Tone.Transport.schedule((time) => {
+                Tone.Draw.schedule(() => {
+                    clearAllHighlights();
+                }, time);
+            }, 0);
+
+            // 2. Schedule highlight reset at the exact end of the track duration
+            Tone.Transport.schedule((time) => {
+                Tone.Draw.schedule(() => {
+                    clearAllHighlights();
+                }, time);
+            }, currentMidi.durationTicks + "i");
+
+            // 3. Determine which tracks to play based on hand selection
+            const mode = handSelection.value; // 'both', 'right', 'left'
+
+            currentMidi.tracks.forEach((track, trackIndex) => {
+                if (mode === 'right' && trackIndex !== 0) return;
+                if (mode === 'left' && trackIndex !== 1) return;
+                if (mode === 'both' && trackIndex > 1) return;
+
+                const activeClass = trackIndex === 0 ? 'active-track-0' : 'active-track-1';
+
+                track.notes.forEach(note => {
+                    // Note ON
+                    Tone.Transport.schedule((time) => {
+                        synth.triggerAttackRelease(note.name, note.durationTicks + "i", time, note.velocity);
+                        
+                        Tone.Draw.schedule(() => {
+                            const keyEl = document.getElementById(`key-${note.name}`);
+                            if (keyEl) keyEl.classList.add(activeClass); 
+                        }, time);
+                    }, note.ticks + "i"); 
+
+                    // Note OFF
+                    Tone.Transport.schedule((time) => {
+                        Tone.Draw.schedule(() => {
+                            const keyEl = document.getElementById(`key-${note.name}`);
+                            if (keyEl) keyEl.classList.remove(activeClass);
+                        }, time);
+                    }, (note.ticks + note.durationTicks) + "i");
+                });
+            });
+
+            // 4. Auto-stop handler if looping is disabled
+            Tone.Transport.schedule((time) => {
+                if (!Tone.Transport.loop) {
+                    Tone.Draw.schedule(() => {
+                        btnStop.click();
+                    }, time);
+                }
+            }, currentMidi.durationTicks + "i");
+
+            Tone.Transport.start();
+            btnPlay.disabled = true;
+            btnStop.disabled = false;
+            statusText.innerText = "Playing...";
+        });
+
+        btnStop.addEventListener('click', () => {
+            Tone.Transport.stop();
+            clearAllHighlights();
+            btnPlay.disabled = false;
+            btnStop.disabled = true;
+            statusText.innerText = "Stopped.";
+        });
+
+        speedSlider.addEventListener('input', (e) => {
+            const speed = parseFloat(e.target.value);
+            speedDisplay.innerText = speed.toFixed(1) + "x";
+            
+            if (currentMidi) {
+                const baseBpm = currentMidi.header.tempos.length > 0 ? currentMidi.header.tempos[0].bpm : 120;
+                Tone.Transport.bpm.value = baseBpm * speed;
+            }
+        });
+    </script>
+</body>
+</html>
